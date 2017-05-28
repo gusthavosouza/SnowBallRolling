@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Game</title>
+<meta charset="utf-8">
+<meta name="viewport"
+	content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+<style>
+body {
+	color: #3f415f;
+	font-family: Monospace;
+	font-size: 13px;
+	background-color: #000;
+	margin: 0px;
+	overflow: hidden;
+}
+
+#info {
+	position: absolute;
+	top: 0px;
+	width: 200px;
+	left: calc(50% - 100px);
+	text-align: center;
+}
+
+.button {
+	background-color: #e7e7e7;
+	border: none;
+	color: white;
+	padding: 15px 32px;
+	text-align: center;
+	text-decoration: none;
+	display: inline-block;
+	font-size: 32px;
+	color: black;
+	cursor: pointer;
+}
+
+.algCen {
+	position: absolute;
+	top: 45%;
+	left: 45%;
+	color:red;
+	font-size: 32px;
+}
+
+a {
+	color: #00f;
+}
+
+.white {
+	color:white;
+}
+</style>
+</head>
+<body>
+
+	<div id="container">
+		<div align="center" id="iniciarGame" class="white"
+			style="font-weight: bold; padding: 5px; font-size: 5em;">
+			<span style="float: left;">PONTUAÇÃO</span> <span id="placar">0.0</span>
+			<span style="float: right;">km</span>
+		</div>
+
+		<div id="gameOver" class="algCen" style="display:none;">
+			<h1> GAME OVER </h1>
+		</div>
+		
+		<div id="finalGame" class="algCen" style="display:none;">
+			<h1> Você Conseguiu PARABÉNS! :) </h1>
+		</div>
+		
+		<div class="white">
+			<p><b>Controles:</b> </p>
+			<p>Segure A para mover para a esquerda</p>
+			<p>Segure D para mover para a direita</p>
+			
+		</div>
+		
+		<div id="jogarMenu" align="center">
+			<button onclick="jogar();" class="button">JOGAR</button>
+		</div>
+
+	</div>
+
+	<script src="lib/build/three.min.js"></script>
+	<script src="lib/build/controls/orbit_controls.js"></script>
+	<script src="lib/build/Mirror.js"></script>
+	<script src="lib/build/controls/THREEx.KeyboardState.js"></script>
+
+	<script>
+		function jogar() {
+			document.getElementById('jogarMenu').style = 'display:none';
+			caiuDireitaOuEsquerda = false;
+			colidiuNaCaixa = false;
+			rolling = true;
+		}
+
+		var WIDTH = window.innerWidth;
+		var HEIGHT = window.innerHeight;
+
+		// camera
+		var VIEW_ANGLE = 45;
+		var ASPECT = WIDTH / HEIGHT;
+		var NEAR = 1;
+		var FAR = 500;
+
+		var camera, scene, renderer;
+
+		var cameraControls;
+
+		var sphereGroup, smallSphere;
+		var keyboard = new THREEx.KeyboardState();
+		var mainLight, soloLight;
+		var background;
+		var placar = document.getElementById('placar');
+
+		var audio = document.createElement('audio');
+
+		var source  = document.createElement('source'); 
+		source.src = 'songs/musica.mp3';
+		audio.appendChild(source);
+		audio.loop = true;
+		audio.play();
+
+		var audio2 = document.createElement('audio');
+		var source2 = document.createElement('source');
+		source2.src = 'songs/crash.mp3';
+		audio2.appendChild(source2);
+		
+		var FRENTE = 1;
+		var DIREITA = 2;
+		var ESQUERDA = 3;
+
+		var OBSTACULO = {
+			pos : FRENTE
+		};
+
+		var OBSTACULO_DIREITA = {
+			pos : DIREITA
+		};
+
+		var OBSTACULO_ESQUERDA = {
+			pos : ESQUERDA
+		};
+
+		var OBSTACULOS = [];
+
+		
+			var MAP = [FRENTE, FRENTE, OBSTACULO, FRENTE, OBSTACULO,
+					OBSTACULO_DIREITA, FRENTE, FRENTE, FRENTE, FRENTE, FRENTE,
+					FRENTE, FRENTE, FRENTE, FRENTE, FRENTE, FRENTE];
+
+			// var MAP = new Array();
+			
+			MAP.push(FRENTE);
+			
+			for (var i =0; i < 100; i++) {
+					if (i % 2 == 0) {
+						MAP.push(OBSTACULO_ESQUERDA);
+					}
+					
+					if (i % 3 == 0) {
+						MAP.push(OBSTACULO);
+					}
+					
+					if (i % 2 == 1) {
+						MAP.push(OBSTACULO_DIREITA);
+					}
+					
+					MAP.push(FRENTE);
+			}
+		
+		init();
+		animate();
+		
+		function init() {
+
+			// 			var MAP = [ FRENTE, DIREITA, DIREITA, DIREITA, FRENTE, FRENTE,
+			// 					FRENTE, DIREITA, DIREITA, FRENTE, ESQUERDA, ESQUERDA,
+			// 					FRENTE, FRENTE ];
+
+					
+			var container = document.getElementById('container');
+
+			// renderer
+			renderer = new THREE.WebGLRenderer();
+			renderer.setPixelRatio(window.devicePixelRatio);
+			renderer.setSize(WIDTH, HEIGHT);
+
+			renderer.setClearColor(0x000000, 1);
+
+			container.appendChild(renderer.domElement);
+
+			// scene
+			scene = new THREE.Scene();
+
+			// camera
+			camera = new THREE.PerspectiveCamera(VIEW_ANGLE, ASPECT, NEAR, FAR);
+			camera.position.set(0, 75, 160);
+
+			cameraControls = new THREE.OrbitControls(camera,
+					renderer.domElement);
+			//  cameraControls.target.set(0, 40, 0);
+			cameraControls.maxDistance = 400;
+			cameraControls.minDistance = 10;
+			cameraControls.update();
+
+			var loader = new THREE.TextureLoader();
+
+			var plan = new THREE.PlaneGeometry(1000, 1000);
+
+			var mat = new THREE.MeshPhongMaterial();
+
+			mat.side = THREE.DoubleSide;
+
+			background = new THREE.Mesh(plan, mat);
+
+			background.rotateX(-Math.PI / 2);
+
+			mat.map = loader.load("img/ground_texture.jpg", function(texture) {
+				plan.map = texture;
+			});
+
+			mat.bumpMap = loader.load("img/ground_texture.png");
+			mat.bumpScale = 1;
+
+			background.position.y = -50;
+
+			scene.add(background);
+
+			var XX = 100.1;
+			var planeGeo = new THREE.PlaneGeometry(100.1, 150);
+
+			var material = new THREE.MeshPhongMaterial();
+
+			material.side = THREE.DoubleSide;
+
+			var ground = new THREE.Mesh(planeGeo, material);
+
+			ground.rotateX(-Math.PI / 2);
+
+			ground.position.z = -70;
+
+			var texturas = [];
+
+			texturas.push(loader.load("img/ground_texture.jpg"));
+			texturas.push(loader.load("img/textura_gelo_2.jpg"));
+
+			material.map = texturas[0];
+
+			material.bumpMap = loader.load("img/ground_texture.png");
+			material.bumpScale = 1;
+
+			var texture = new THREE.TextureLoader()
+					.load('img/caixa_textura.jpg');
+			var geometry = new THREE.BoxBufferGeometry(25, 25, 25);
+			var material = new THREE.MeshPhongMaterial({
+				map : texture
+			});
+			
+			material.bumpMap = loader.load("img/caixa_bump_map.png");
+			material.bumpScale = 1;
+			
+			var cube = new THREE.Mesh(geometry, material);
+			cube.position.y = 15;
+
+			
+			
+			scene.add(ground);
+
+			var lastZ = 0.0;
+			var lastX = 0.0;
+
+			for (var i = 0; i < MAP.length; i++) {
+				var map = ground.clone();
+				var index = (i + 1);
+
+				if (MAP[i] == FRENTE) {
+					lastZ -= 150;
+					map.position.z = lastZ;
+					map.position.x = lastX;
+				} else if (MAP[i] == DIREITA) {
+					lastZ -= 150;
+					lastX += 40;
+
+					map.position.x = lastX;
+					map.position.z = lastZ;
+
+				} else if (MAP[i] == ESQUERDA) {
+
+					lastZ -= 150;
+					lastX -= 40;
+
+					map.position.x = lastX;
+					map.position.z = lastZ;
+				}
+
+				if (MAP[i] == OBSTACULO || MAP[i] == OBSTACULO_DIREITA
+						|| MAP[i] == OBSTACULO_ESQUERDA) {
+					var cub = cube.clone();
+					cub.position.z = lastZ;
+
+					var POS = MAP[i].pos;
+
+					if (POS == FRENTE) {
+						cub.position.x = 0;
+					} else if (POS == DIREITA) {
+						cub.position.x = 25;
+					} else if (POS == ESQUERDA) {
+						cub.position.x = -25;
+					}
+
+					OBSTACULOS.push(cub.position);
+
+					scene.add(cub);
+				}
+
+				scene.add(map);
+			}
+
+			var geometry = new THREE.IcosahedronGeometry(12, 2);
+			var material = new THREE.MeshPhongMaterial();
+
+			smallSphere = new THREE.Mesh(geometry, material);
+			smallSphere.position.y = 24 * Math.sin(Math.PI / 180 * 30); // 12
+			smallSphere.position.z = 0;
+
+			material.map = loader.load("img/bb8_textura.jpg",
+					function(texture) {
+						smallSphere.map = texture;
+					});
+
+			scene.add(smallSphere);
+			// lights
+			mainLight = new THREE.PointLight(0xcccccc, 1.5, 250);
+			mainLight.position.y = 60;
+
+			soloLight = new THREE.PointLight(0xcccccc, 1.5, 500);
+			soloLight.position.y = -5;
+			soloLight.position.z = 250;
+
+			scene.add(mainLight);
+			scene.add(soloLight);
+		}
+
+		var velocidadeMax = 10;
+		var velocidade = 0;
+		var rotacaoVelo = 0.2;
+
+		var caiuDireitaOuEsquerda = false;
+		var colidiuNaCaixa = false;
+
+		function move(code) {
+			var timer = 0.0051;
+			if (code == 119) { // sobe
+				moveUp(timer);
+			} else if (code == 97) { // esquerda
+				moveLeft(timer);
+			} else if (code == 100) { // direita
+				moveRigth(timer);
+			} else if (code == 115) { // desce
+				moveDown(timer);
+			}
+
+			if (velocidade < velocidadeMax) {
+				velocidade += 0.4;
+			}
+
+			if (!caiuDireitaOuEsquerda) {
+				smallSphere.position.y = 24 * Math.sin(Math.PI / 180 * 30);
+			}
+		}
+
+		function moveRigth(timer) {
+			smallSphere.rotation.z -= timer * velocidade;
+			smallSphere.position.x += 2;
+			camera.position.x += 2;
+			mainLight.position.x += 2;
+			soloLight.position.x += 2;
+			background.position.x = 2;
+		}
+
+		function moveLeft(timer) {
+			smallSphere.rotation.z += timer * velocidade;
+			smallSphere.position.x -= 2;
+			camera.position.x -= 2;
+			mainLight.position.x -= 2;
+			soloLight.position.x -= 2;
+			background.position.x = 2;
+		}
+
+		function moveUp(timer) {
+			smallSphere.rotation.x -= timer * velocidade;
+			smallSphere.position.z -= 2;
+			camera.position.z -= 2;
+			mainLight.position.z -= 2;
+			soloLight.position.z -= 2;
+			background.position.z -= 2;
+		}
+
+		function moveDown(timer) {
+			smallSphere.rotation.x += timer * velocidade;
+			smallSphere.position.z += 2;
+			camera.position.z += 2;
+			mainLight.position.z += 2;
+			soloLight.position.z += 2;
+			background.position.z += 2;
+		}
+
+		var rigth = false, up = false, down = false, left = false;
+		var rolling = false;
+
+		function reset() {
+			rigth = false;
+			up = false;
+			left = false;
+			down = false;
+		}
+
+		var iterations = 0;
+
+		function animate() {
+
+			if (!caiuDireitaOuEsquerda && !colidiuNaCaixa || colidiuNaCaixa || caiuDireitaOuEsquerda) {
+				requestAnimationFrame(animate);
+			}
+
+			if (!caiuDireitaOuEsquerda && !colidiuNaCaixa) {
+				placar.innerHTML = smallSphere.position.z.toFixed(1) * -1;
+			}
+
+			if (keyboard.pressed("p")) {
+				rolling = true;
+			}
+			
+			if (smallSphere.position.z <= -17300) {
+				var msg = document.getElementById('finalGame').style = '';			
+			}
+
+			if (colidiuNaCaixa) {
+				console.info(colidiuNaCaixa);
+				smallSphere.position.y += 1;
+				smallSphere.position.z += 5;
+				
+				document.getElementById('gameOver').style = '';
+				
+				if (smallSphere.position.z > 450) {
+					colidiuNaCaixa = false;
+					location.reload();
+					document.getElementById('jogarMenu').style = '';
+					smallSphere.position.z = 0;
+					camera.position.set(0, 75, 160);
+					cameraControls.update();
+				}
+			}
+
+			if (caiuDireitaOuEsquerda) {
+				smallSphere.position.y -= 1;
+				
+				document.getElementById('gameOver').style = '';	
+				if (smallSphere.position.y <= -50) {
+					caiuDireitaOuEsquerda = false;
+					location.reload();
+				}
+			}
+
+			if (keyboard.pressed("d")) {
+				move(100);
+				reset();
+				rigth = true;
+			}
+			if (keyboard.pressed("a")) {
+				move(97);
+				reset();
+				left = true;
+			}
+			if (rolling || keyboard.pressed("w")) {
+				move(119);
+				reset();
+				up = true;
+			}
+			if (keyboard.pressed("s")) {
+				move(115);
+				reset();
+				down = true;
+			}
+
+			if (velocidade > 0) {
+				var moviment = 0.3 * velocidade;
+				if (rigth) {
+					smallSphere.rotation.z -= moviment;
+					smallSphere.position.x += moviment;
+					camera.position.x += moviment;
+					mainLight.position.x += moviment;
+					soloLight.position.x += moviment;
+					background.position.x += moviment;
+				} else if (down) {
+					smallSphere.rotation.x += moviment;
+					smallSphere.position.z += moviment;
+					camera.position.z += moviment;
+					mainLight.position.z += moviment;
+					soloLight.position.z += moviment;
+					background.position.z += moviment;
+				} else if (up) {
+					smallSphere.rotation.x -= moviment;
+					smallSphere.position.z -= moviment;
+					camera.position.z -= moviment;
+					mainLight.position.z -= moviment;
+					soloLight.position.z -= moviment;
+					background.position.z -= moviment;
+				} else if (left) {
+					smallSphere.rotation.z += moviment;
+					smallSphere.position.x -= moviment;
+					camera.position.x -= moviment;
+					mainLight.position.x -= moviment;
+					soloLight.position.x -= moviment;
+					background.position.x -= moviment;
+				}
+				velocidade -= 0.1;
+			} else {
+				reset();
+			}
+
+			var timer = Date.now() * 0.01;
+			camera.lookAt(smallSphere.position);
+			if (iterations++ == 5 && !caiuDireitaOuEsquerda) {
+				colided();
+				iterations = 0;
+			}
+			renderer.render(scene, camera);
+		}
+
+		var estouDentroDoMapa = true;
+
+		function colided() {
+
+			var ballX = smallSphere.position.x;
+
+			if (ballX < 0 && ballX < -55) {
+				estouDentroDoMapa = false;
+				audio.pause();
+				audio2.play();
+			}
+
+			if (ballX > 0 && ballX >= 55) {
+				estouDentroDoMapa = false;
+				audio.pause();
+				audio2.play();
+			}
+
+			for (var i = 0; i < OBSTACULOS.length; i++) {
+				var pos = OBSTACULOS[i];
+				if (pos.distanceTo(smallSphere.position) <= 22) {
+					colidiuNaCaixa = true;
+					audio.pause();
+					audio2.play();
+				}
+			}
+
+			if (!estouDentroDoMapa || colidiuNaCaixa) {
+				caiuDireitaOuEsquerda = true;
+				rolling = false;
+			}
+
+		}
+	</script>
+</body>
+</html>
+
