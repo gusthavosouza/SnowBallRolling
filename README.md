@@ -2,6 +2,8 @@
 
 Projeto apresentado na aula de Computação Gráfica para escola de computação curso de Ciência da Computação - [USCS](http://uscs.edu.br/cursos-de-graduacao/escola-de-computacao/ciencia-da-computacao/)
 
+* Orientador [Ricardo Resende de Mendonça](http://buscatextual.cnpq.br/buscatextual/visualizacv.do?metodo=apresentar&id=K8453320U9)
+
 ## Rodando o jogo
 Abra o link [clique aqui](https://gusthavosouza.github.io/SnowBallRolling) e clique em Começar.
 Você também pode fazer um clone do projeto e rodar localhost:
